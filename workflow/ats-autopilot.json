@@ -1,0 +1,1237 @@
+{
+  "name": "ATS Autopilot ; Profile‑Driven Resume Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $('Workflow Configuration').item.json.profileDocId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "id": "9eae2ee1-d3b7-4dec-b83e-17b9d0e3798c",
+      "name": "Google Docs API - Get Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -2848,
+        2064
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const doc = $json;\nconst content = doc?.body?.content || [];\nlet fullText = '';\nfor (const el of content) {\n  const p = el.paragraph;\n  if (!p?.elements) continue;\n  for (const pe of p.elements) {\n    const t = pe.textRun?.content;\n    if (t) fullText += t;\n  }\n}\nreturn [{ json: { docId: doc.documentId, fullText } }];"
+      },
+      "id": "8ab2ca3a-b484-46a8-91da-3a7823444827",
+      "name": "Extract Full Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2624,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "linkedinUrl",
+              "value": "=https://www.linkedin.com/jobs/search/?keywords={{ encodeURIComponent($('Workflow Configuration').first().json.jobSearchQuery) }}&location=Germany&f_TPR=r86400&f_WT=1%2C2%2C3&f_E=2%2C3&sortBy=DD",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "06d83f58-326b-4ac1-9dab-900b96eb1833",
+      "name": "Build LinkedIn URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1616,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "5be272d9-61c3-4b82-a337-4902c45d8856",
+      "name": "Wait 10 Seconds1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -816,
+        1776
+      ],
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allJobs = $input.all();\nconst config = $('Workflow Configuration').first().json;\nconst supabaseUrl = config.supabaseUrl;\nconst supabaseKey = config.supabaseKey;\nconst existingUrls = new Set();\nasync function checkJobExists(jobUrl) {\n  try {\n    const response = await fetch(`${supabaseUrl}/rest/v1/applications?job_url=eq.${encodeURIComponent(jobUrl)}&select=job_url`, { method: 'GET', headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json' } });\n    if (!response.ok) return null;\n    const data = await response.json();\n    return data.length > 0 ? jobUrl : null;\n  } catch (error) { return null; }\n}\nconst checkPromises = allJobs.map(job => checkJobExists(job.json.jobLink));\nconst results = await Promise.all(checkPromises);\nfor (const url of results) { if (url) existingUrls.add(url); }\nconst newJobs = allJobs.filter(job => !existingUrls.has(job.json.jobLink));\nreturn newJobs;"
+      },
+      "id": "cae3bc40-9a4a-44b8-adc4-3c37675f71f8",
+      "name": "Filter Out Duplicates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        2144
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -2752,
+        2320
+      ],
+      "id": "1ab38848-50ae-4c00-927c-68b89cea9264",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the model's text from whatever shape the chain returns\nlet txt =\n  $json.text\n  ?? $json.output\n  ?? $json.response?.generations?.[0]?.[0]?.text\n  ?? '';\n\ntxt = String(txt).trim()\n  .replace(/^```json\\s*/i, '')\n  .replace(/^```\\s*/, '')\n  .replace(/```\\s*$/, '')\n  .trim();\n\nlet candidate;\ntry {\n  candidate = JSON.parse(txt);\n} catch (e) {\n  throw new Error('Profile Parser did not return valid JSON: ' + e.message + ' :: ' + txt.slice(0, 300));\n}\nreturn [{ json: { candidate } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2096,
+        2064
+      ],
+      "id": "106f3b93-d29b-4653-bb09-89dd291b4c38",
+      "name": "Parse Candidate JSON"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.supabaseUrl }}/rest/v1/profile?on_conflict=doc_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ doc_id: $('Workflow Configuration').first().json.profileDocId, candidate_json: $json.candidate, updated_at: $now.toISO() }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1888,
+        2064
+      ],
+      "id": "77874870-fd73-40da-8c14-34801ca78517",
+      "name": "Store Profile Cache"
+    },
+    {
+      "parameters": {
+        "jsCode": "const candidate = $('Parse Candidate JSON').first().json.candidate || {};\nconst avoidTitles = (candidate.do_not_apply || []).map(s => s.toLowerCase());\nconst avoidIndustries = ((candidate.targeting && candidate.targeting.industries_avoid) || []).map(s => s.toLowerCase());\n\n// German + English equivalents so the title filter is robust\nconst extra = ['working student','werkstudent','intern','internship','praktikum','praktikant',\n               'master thesis','masterarbeit','ausbildung','apprentice','trainee','duales studium'];\nconst blockTitle = [...new Set([...avoidTitles, ...extra])].filter(Boolean);\n\nconst out = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  const title = (j.title || '').toLowerCase();\n  const hay = `${j.title || ''} ${j.jobDescription || ''}`.toLowerCase();\n  const blockedByTitle = blockTitle.some(t => title.includes(t));\n  const blockedByIndustry = avoidIndustries.some(t => t && hay.includes(t));\n  if (blockedByTitle || blockedByIndustry) continue;\n  out.push(item);\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2464,
+        2512
+      ],
+      "id": "9f8c0d70-74d3-4fb6-9a18-65e091ac6440",
+      "name": "Hard Pre-Filter"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a strict technical recruiter. Evaluate how well the candidate fits ONE job. Return JSON ONLY ; no markdown, no commentary.\n\nSCORING RULES:\n- Score 0-100 based ONLY on technical and domain fit between the candidate's skills/experience and the job requirements.\n- German (or any local-language) proficiency MUST NOT affect the score. Ignore all language requirements when scoring.\n- Never claim skills listed in DO_NOT_CLAIM. If the job requires them, put them in \"missing_skills\".\n- Treat keyword aliases as equivalent (e.g. K8s = Kubernetes) so wording never lowers the score.\n- \"should_apply\" is true only if the role matches the candidate's target titles/seniority AND does not explicitly refuse visa sponsorship.\n- \"recommended_keywords\": terms from the job the candidate can TRUTHFULLY add (supported by real experience).\n\nReturn EXACTLY this shape:\n{\"match_score\": 0, \"should_apply\": false, \"missing_skills\": [], \"strengths\": [], \"recommended_keywords\": [], \"reason\": \"\"}\n\nCANDIDATE:\nTarget titles: {{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.targeting.titles) }}\nSeniority: {{ $('Parse Candidate JSON').first().json.candidate.targeting.seniority }}\nSkills: {{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.skills) }}\nKeyword aliases: {{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.keyword_aliases) }}\nDO_NOT_CLAIM: {{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.do_not_claim) }}\n\nJOB:\nTitle: {{ $json.title }}\nCompany: {{ $json.company }}\nDescription: {{ $json.jobDescription }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -2224,
+        2512
+      ],
+      "id": "c8a99b5d-6ea3-4519-b5d5-55861819a84e",
+      "name": "Job Matcher"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -2224,
+        2640
+      ],
+      "id": "93f7a531-cf29-4207-a129-b32662878b19",
+      "name": "Groq Chat Model2",
+      "credentials": {
+        "groqApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You convert a candidate profile document into STRICT JSON.\n\nRULES:\n- Copy content verbatim from the document. Do NOT summarize, rephrase, infer, invent, or omit anything.\n- If a field is absent in the document, use an empty string \"\" or empty array [].\n- Map the document's sections to the exact schema below. Keys must match exactly.\n- Return JSON ONLY ; no markdown, no code fences, no commentary.\n\nSCHEMA:\n{\n  \"identity\": { \"name\":\"\", \"location\":\"\", \"phone\":\"\", \"email\":\"\", \"linkedin\":\"\", \"github\":\"\", \"portfolio\":\"\", \"medium\":\"\", \"work_authorization\":\"\", \"open_to_relocation\":\"\", \"languages\":[{\"language\":\"\",\"level\":\"\"}] },\n  \"targeting\": { \"titles\":[], \"seniority\":\"\", \"locations\":[], \"work_type\":[], \"industries_target\":[], \"industries_avoid\":[], \"deal_breakers\":\"\", \"salary_expectation\":\"\" },\n  \"summary\": \"\",\n  \"experience\": [ { \"company\":\"\", \"location\":\"\", \"title\":\"\", \"dates\":\"\", \"context\":\"\", \"stack\":[], \"bullets\":[] } ],\n  \"projects\": [ { \"name\":\"\", \"description\":\"\", \"tech\":[], \"link\":\"\", \"blog\":\"\" } ],\n  \"education\": [ { \"degree\":\"\", \"institution\":\"\", \"city\":\"\", \"dates\":\"\", \"thesis\":\"\", \"coursework\":[] } ],\n  \"skills\": { },\n  \"certifications\": [],\n  \"publications\": [],\n  \"awards\": [],\n  \"keyword_aliases\": { },\n  \"do_not_claim\": [],\n  \"do_not_apply\": []\n}\n\nFor \"skills\", use one key per category (e.g. \"Cloud\", \"Languages\") mapping to an array.\nFor \"keyword_aliases\", map each alias to its canonical term (e.g. \"K8s\":\"Kubernetes\").\n\nPROFILE DOCUMENT:\n{{ $('Extract Full Text').item.json.fullText }}",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -2384,
+        2064
+      ],
+      "id": "e8b8d688-9dbf-4c93-adf2-2d89471041d9",
+      "name": "Profile Parser"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "let txt = $json.text ?? $json.output ?? ($json.response?.generations?.[0]?.[0]?.text) ?? '';\ntxt = String(txt).trim().replace(/^```json\\s*/i,'').replace(/^```\\s*/,'').replace(/```\\s*$/,'').trim();\n\nlet match;\ntry { match = JSON.parse(txt); }\ncatch (e) { match = { match_score:0, should_apply:false, missing_skills:[], strengths:[], recommended_keywords:[], reason:'parse error: '+e.message }; }\n\nconst job = $('Hard Pre-Filter').item.json;   // paired original job\nreturn { json: { ...job, match } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1872,
+        2512
+      ],
+      "id": "0d52e7db-5dd0-408d-a356-4974eed30fde",
+      "name": "Parse Match JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0499f21c-4487-46e9-81ef-d1ec539cb602",
+              "leftValue": "={{ $json.match.should_apply }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b7d0f5f6-bc2d-4879-856d-7ddf9e935f6c",
+              "leftValue": "={{ $json.match.match_score }}",
+              "rightValue": "={{ $('Workflow Configuration').first().json.matchScoreThreshold }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1664,
+        2512
+      ],
+      "id": "72da168a-523c-4000-a51f-d3b7ac62a8c9",
+      "name": "IF Gate"
+    },
+    {
+      "parameters": {
+        "maxItems": 5
+      },
+      "id": "4d0d6622-703c-4d70-b7d1-a1ac9935d56a",
+      "name": "Limit to 5 Jobs",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        2144
+      ]
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1328,
+        2544
+      ],
+      "id": "8b4644fd-650c-4fb4-8d34-b7895bd5f6e1",
+      "name": "Groq Chat Model3",
+      "credentials": {
+        "groqApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an expert ATS resume writer. Produce a tailored resume for ONE job as STRICT JSON ; no markdown, no commentary.\n\nRULES:\n- SELECT, don't dump: choose the 3-5 MOST relevant bullets per role for THIS job. Rephrase for impact, but NEVER invent facts, metrics, tools, or responsibilities.\n- Choose the 2-3 MOST relevant projects (not all). Turn each into 1-2 concise bullets.\n- Keep EXPERIENCE in reverse-chronological order (most recent first). Do not reorder by relevance.\n- Integrate recommended keywords NATURALLY inside the action and outcome of a bullet. NEVER append phrases like \"utilizing X skills\", \"leveraging Y expertise\", or \"demonstrating proficiency in Z\" ; that is keyword stuffing and is forbidden.\n- Each bullet = strong action verb + what you did + concrete outcome. One clean sentence.\n- Never claim anything in DO_NOT_CLAIM: {{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.do_not_claim) }}\n- Keep all skills the candidate genuinely has that are relevant to this job (do not drop relevant skills like Kubernetes). You may reorder or trim only clearly-irrelevant categories.\n- Each company must appear EXACTLY ONCE in \"experience\". Put ALL selected bullets for that company under its single entry. Never output two entries for the same company.\n- List experience in the SAME order it appears in CANDIDATE EXPERIENCE ; do not reorder.\n- Output EXACTLY 2-3 projects. Only include a project if you write at least one bullet for it. NEVER include a project with an empty \"bullets\" array.\n- Summary: 2-3 sentences, specific and results-oriented. No clichés (\"seeking a challenging role\", \"drive innovation and excellence\").\n- Do NOT add the target job as an experience entry. \"experience\" must contain ONLY the candidate's real past roles from CANDIDATE EXPERIENCE.\n\nRecommended keywords to weave in truthfully: {{ JSON.stringify($json.match.recommended_keywords) }}\n\nEXAMPLE ; bad vs good bullet:\nBAD:  \"Established CI/CD pipelines with GitHub Actions for deployments, leveraging CI/CD Pipelines expertise.\"\nGOOD: \"Built CI/CD pipelines with GitHub Actions to deliver repeatable, resilient cloud-native deployments.\"\n\nReturn EXACTLY this shape:\n{\"summary\":\"\",\"experience\":[{\"company\":\"\",\"location\":\"\",\"title\":\"\",\"dates\":\"\",\"bullets\":[]}],\"projects\":[{\"name\":\"\",\"link\":\"\",\"bullets\":[]}],\"skills\":{}}\n\nCANDIDATE EXPERIENCE:\n{{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.experience) }}\n\nCANDIDATE PROJECTS:\n{{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.projects) }}\n\nCANDIDATE SKILLS:\n{{ JSON.stringify($('Parse Candidate JSON').first().json.candidate.skills) }}\n\nTARGET JOB:\nTitle: {{ $json.title }}\nCompany: {{ $json.company }}\nDescription: {{ $json.jobDescription }}",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1344,
+        2400
+      ],
+      "id": "5dc0dbd2-a247-4d5f-89b1-0a607e4fd67d",
+      "name": "Resume Builder"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// pull out the FIRST complete {...} object, ignoring code fences / trailing junk\nfunction extractJson(s) {\n  const start = s.indexOf('{');\n  if (start < 0) return s;\n  let depth = 0, inStr = false, esc = false;\n  for (let i = start; i < s.length; i++) {\n    const ch = s[i];\n    if (inStr) {\n      if (esc) esc = false;\n      else if (ch === '\\\\') esc = true;\n      else if (ch === '\"') inStr = false;\n    } else if (ch === '\"') inStr = true;\n    else if (ch === '{') depth++;\n    else if (ch === '}') { depth--; if (depth === 0) return s.slice(start, i + 1); }\n  }\n  return s.slice(start);\n}\n\nlet raw = $json.text ?? $json.output ?? ($json.response?.generations?.[0]?.[0]?.text) ?? '';\nraw = String(raw).trim().replace(/^```json\\s*/i,'').replace(/^```\\s*/,'').replace(/```\\s*$/,'').trim();\n\nlet resume;\ntry { resume = JSON.parse(extractJson(raw)); }\ncatch (e) { throw new Error('Resume Builder returned invalid JSON: ' + e.message + ' :: ' + raw.slice(0,300)); }\n\nconst c   = $('Parse Candidate JSON').first().json.candidate || {};\nconst id  = c.identity || {};\nconst job = $('Parse Match JSON').item.json;\n\n// dedupe experience by company+title+dates, merging bullets\nconst seen = new Map();\nfor (const e of (resume.experience || [])) {\n  const key = `${e.company||''}|${e.title||''}|${e.dates||''}`;\n  if (seen.has(key)) seen.get(key).bullets.push(...(e.bullets || []));\n  else seen.set(key, { ...e, bullets: [...(e.bullets || [])] });\n}\nresume.experience = [...seen.values()];\n\n// keep ONLY real companies from the profile (drops injected target job / hallucinations)\nconst realCompanies = new Set((c.experience || []).map(e => (e.company||'').toLowerCase().trim()));\nresume.experience = resume.experience.filter(e => realCompanies.has((e.company||'').toLowerCase().trim()));\n\n// order to match the profile (reverse-chronological source order)\nconst order = (c.experience || []).map(e => `${e.company||''}|${e.title||''}`);\nresume.experience.sort((a, b) => {\n  const ia = order.indexOf(`${a.company||''}|${a.title||''}`);\n  const ib = order.indexOf(`${b.company||''}|${b.title||''}`);\n  return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);\n});\n\n// projects: keep only those with bullets, cap at 3\nresume.projects = (resume.projects || [])\n  .filter(p => Array.isArray(p.bullets) && p.bullets.length > 0)\n  .slice(0, 3);\n\n// merge identity/contact\nresume.name = id.name || '';\nresume.contact = {\n  location: id.location || '', phone: id.phone || '', email: id.email || '',\n  linkedin: id.linkedin || '', github: id.github || '', portfolio: id.portfolio || '', medium: id.medium || ''\n};\n\nreturn { json: {\n  resume,\n  company: job.company || '', title: job.title || '', jobLink: job.jobLink || '',\n  postedAt: job.postedAt || '', location: job.location || '', match: job.match || {}\n}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -992,
+        2400
+      ],
+      "id": "26b31cb1-cd44-4ad5-8e4d-989b89feb2cc",
+      "name": "Parse Resume JSON"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const r = $json.resume || {};\nconst c = $('Parse Candidate JSON').first().json.candidate || {};\nconst esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst ct = r.contact || {};\nconst links = [];\nif (ct.location) links.push(esc(ct.location));\nif (ct.phone) links.push(esc(ct.phone));\nif (ct.email) links.push(`<a href=\"mailto:${esc(ct.email)}\">${esc(ct.email)}</a>`);\nif (ct.linkedin) links.push(`<a href=\"${esc(ct.linkedin)}\">LinkedIn</a>`);\nif (ct.github) links.push(`<a href=\"${esc(ct.github)}\">GitHub</a>`);\nif (ct.portfolio) links.push(`<a href=\"${esc(ct.portfolio)}\">Portfolio</a>`);\nif (ct.medium) links.push(`<a href=\"${esc(ct.medium)}\">Medium</a>`);\n\nlet h = '';\nh += `<h1 style=\"text-align:center;margin-bottom:2px\">${esc(r.name)}</h1>`;\nh += `<p style=\"text-align:center\">${links.join(' &nbsp;•&nbsp; ')}</p>`;\nif (r.summary) h += `<h2>Summary</h2><p>${esc(r.summary)}</p>`;\n\nif ((r.experience||[]).length) {\n  h += `<h2>Professional Experience</h2>`;\n  for (const e of r.experience) {\n    h += `<p style=\"margin-bottom:0\"><b>${esc(e.company)}</b> ; ${esc(e.location)}<br><i>${esc(e.title)}</i> · ${esc(e.dates)}</p>`;\n    if ((e.bullets||[]).length) h += `<ul>`+e.bullets.map(b=>`<li>${esc(b)}</li>`).join('')+`</ul>`;\n  }\n}\nif ((r.projects||[]).length) {\n  h += `<h2>Projects</h2>`;\n  for (const p of r.projects) {\n    const name = p.link ? `<a href=\"${esc(p.link)}\">${esc(p.name)}</a>` : esc(p.name);\n    h += `<p style=\"margin-bottom:0\"><b>${name}</b></p>`;\n    if ((p.bullets||[]).length) h += `<ul>`+p.bullets.map(b=>`<li>${esc(b)}</li>`).join('')+`</ul>`;\n  }\n}\nconst edu = c.education || [];\nif (edu.length) {\n  h += `<h2>Education</h2>`;\n  for (const ed of edu) {\n    h += `<p style=\"margin-bottom:0\"><b>${esc(ed.degree)}</b> ; ${esc(ed.institution)}${ed.city?', '+esc(ed.city):''}<br><i>${esc(ed.dates)}</i>${ed.thesis?` · Thesis: ${esc(ed.thesis)}`:''}</p>`;\n  }\n}\nif (r.skills && Object.keys(r.skills).length) {\n  h += `<h2>Skills</h2>`;\n  for (const [cat, items] of Object.entries(r.skills)) {\n    h += `<p style=\"margin:0\"><b>${esc(cat)}:</b> ${esc((items||[]).join(', '))}</p>`;\n  }\n}\nconst safe = s => String(s||'').replace(/[\\/\\\\:*?\"<>|]/g,'').slice(0,80);\nconst filename = `${safe($json.company)} - ${safe($json.title)} - ${$json.postedAt || new Date().toISOString().slice(0,10)}`;\nreturn { json: { html: `<html><body>${h}</body></html>`, filename,\n  company: $json.company, title: $json.title, jobLink: $json.jobLink, postedAt: $json.postedAt, match: $json.match, resume: r } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        2400
+      ],
+      "id": "1a9d4560-4655-4d0e-8705-1de0245ae40b",
+      "name": "Render HTML"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const html = $json.html;\nconst boundary = '----n8nBoundary' + Date.now();\nconst metadata = JSON.stringify({ name: $json.filename, mimeType: 'application/vnd.google-apps.document' });\nconst body =\n  `--${boundary}\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n${metadata}\\r\\n` +\n  `--${boundary}\\r\\nContent-Type: text/html; charset=UTF-8\\r\\n\\r\\n${html}\\r\\n` +\n  `--${boundary}--`;\nreturn { json: { ...$json, multipartBody: body, boundary } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3280,
+        2784
+      ],
+      "id": "019eb554-4493-46aa-99f7-1db11c61d656",
+      "name": "Build Multipart"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.id }}/export?mimeType=application/pdf",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdfData"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2864,
+        2784
+      ],
+      "id": "4e5f6f55-261c-41f1-aa40-aabbcfab4878",
+      "name": "Export to PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const src   = $('Parse Resume JSON').item.json;\nconst docId = $('Create Google Doc').item.json.id;\nconst pdfId = $json.id;   // Upload PDF to Drive is the direct input\nconst m = src.match || {};\nconst docLink = docId ? `https://docs.google.com/document/d/${docId}/edit` : '';\nconst pdfLink = pdfId ? `https://drive.google.com/file/d/${pdfId}/view` : '';\nreturn { json: {\n  company: src.company, title: src.title, jobLink: src.jobLink, postedAt: src.postedAt,\n  match_score: m.match_score ?? null, should_apply: m.should_apply ?? null,\n  missing_skills: m.missing_skills ?? [], strengths: m.strengths ?? [],\n  recommended_keywords: m.recommended_keywords ?? [], reason: m.reason ?? '',\n  docLink, pdfLink,\n  application_json: { ...src, docLink, pdfLink }\n}};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2224,
+        2896
+      ],
+      "id": "bd39d0af-c610-45cc-99ad-693d9749adb1",
+      "name": "Assemble Application"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=REDACTED/rest/v1/applications?on_conflict=job_url",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $('Workflow Configuration').first().json.supabaseKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.supabaseKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job_url: $json.jobLink, company: $json.company, title: $json.title, match_score: $json.match_score, should_apply: $json.should_apply, missing_skills: $json.missing_skills, strengths: $json.strengths, recommended_keywords: $json.recommended_keywords, reason: $json.reason, doc_link: $json.docLink, pdf_link: $json.pdfLink, resume_version: 'v2', application_json: $json.application_json, generated_at: $now.toISO() }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1968,
+        2896
+      ],
+      "id": "71baf5f0-b48d-43a2-9f31-73face5f6454",
+      "name": "Store Application"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Workflow Configuration').first().json.userEmail }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "71a6c21f-8bff-4190-a4c4-4af86355d8e1",
+      "name": "Send a message",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -1504,
+        2896
+      ],
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "=multipart/related; boundary={{ $json.boundary }}",
+        "body": "={{ $json.multipartBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3072,
+        2784
+      ],
+      "id": "fe68c733-7dfd-4171-b2e8-77447c01fcea",
+      "name": "Create Google Doc",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Trigger & Config\nDaily schedule + all run parameters: profile doc id, Apify/Supabase keys, match-score threshold.",
+        "height": 348,
+        "width": 500,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3424,
+        1888
+      ],
+      "id": "32d81580-0908-445b-b8e3-a69d66064a88",
+      "name": "Stage 1 ; Trigger & Config"
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Profile Ingestion\nRead Profile Doc → LLM parses to **Candidate JSON** → cache in Supabase.\n\nGoogle Docs API · Extract Full Text · Profile Parser (Groq) · Parse Candidate JSON · Store Profile Cache",
+        "height": 600,
+        "width": 1380,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2928,
+        1888
+      ],
+      "id": "9579af25-cfa7-4bf5-9a9d-231d1b599e6e",
+      "name": "Stage 2 ; Profile Ingestion"
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Job Sourcing\nBuild LinkedIn search → Apify scrape (poll until done) → parse, limit, dedupe.\n\n⤵ continues on the row below: Fetch Results → Parse Jobs → Limit → Filter Out Duplicates",
+        "height": 552,
+        "width": 1028,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1664,
+        1760
+      ],
+      "id": "6769941e-4b0a-4117-be79-dba827a9882d",
+      "name": "Stage 3 ; Job Sourcing"
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Fit Scoring & Gate\nHard pre-filter (do-not-apply) → **Job Matcher** (Groq) returns fit JSON → IF should_apply && score ≥ threshold.",
+        "height": 372,
+        "width": 960,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2512,
+        2384
+      ],
+      "id": "b2a4aae7-cbd7-4082-a58d-70e6a055cfae",
+      "name": "Stage 4 ; Fit Scoring & Gate"
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Resume Generation\n**Resume Builder** (Groq) → tailored resume JSON → clean/validate → render HTML.",
+        "height": 380,
+        "width": 932,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1552,
+        2288
+      ],
+      "id": "c42dda6b-6dfe-4fc8-8268-324fbf0ac70d",
+      "name": "Stage 5 ; Resume Generation"
+    },
+    {
+      "parameters": {
+        "content": "## 6 · Document & Export\nHTML → editable **Google Doc** → export **PDF** → upload to Drive.",
+        "height": 320,
+        "width": 974,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3392,
+        2656
+      ],
+      "id": "a6b6d445-cf41-4251-9f02-f1615766d835",
+      "name": "Stage 6 ; Document & Export"
+    },
+    {
+      "parameters": {
+        "content": "## 7 · Persist & Notify\nAssemble application record → store in Supabase `applications` → **dashboard email**.",
+        "height": 400,
+        "width": 1108
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2416,
+        2720
+      ],
+      "id": "076978ff-7828-42c6-90fa-11f8cd3a36fa",
+      "name": "Stage 7 ; Persist & Notify"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "resumeFileId",
+              "value": "YOUR_GOOGLE_DOC_ID",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "jobSearchQuery",
+              "value": "Software Engineer Junior Developer Java Developer Germany",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "userEmail",
+              "value": "you@example.com",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "apifyActorId",
+              "value": "curious_coder~linkedin-jobs-scraper",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "apifyToken",
+              "value": "YOUR_APIFY_TOKEN",
+              "type": "string"
+            },
+            {
+              "id": "id-7",
+              "name": "supabaseUrl",
+              "value": "https://YOUR_PROJECT.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "supabaseKey",
+              "value": "YOUR_SUPABASE_KEY",
+              "type": "string"
+            },
+            {
+              "id": "8d97efb5-1e7a-431f-84c4-d3f9a3ea2553",
+              "name": "profileDocId",
+              "value": "YOUR_PROFILE_GOOGLE_DOC_ID",
+              "type": "string"
+            },
+            {
+              "id": "d2084dae-ee99-47d7-9e04-c680a14f153f",
+              "name": "matchScoreThreshold",
+              "value": 75,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e16fa9c1-61fa-42a6-80b5-5c7d0e622276",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -3088,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 22,
+              "triggerAtMinute": 58
+            }
+          ]
+        }
+      },
+      "id": "c4081275-0632-4bbf-99eb-dab9882a672d",
+      "name": "Daily 7 AM Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -3344,
+        2064
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/{{ $('Workflow Configuration').first().json.apifyActorId }}/runs?token={{ $('Workflow Configuration').first().json.apifyToken }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"urls\": [\"{{ $('Build LinkedIn URL').first().json.linkedinUrl }}\"], \"scrapeCompany\": false, \"count\": 10 }",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "218bb23f-bf7b-4b2d-aee2-7b8621619450",
+      "name": "Apify - Fetch Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1392,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/acts/{{ $('Workflow Configuration').first().json.apifyActorId }}/runs/{{ $('Apify - Fetch Jobs').first().json.data.id }}?token={{ $('Workflow Configuration').first().json.apifyToken }}",
+        "options": {}
+      },
+      "id": "0aad5e01-2a44-4115-a1d9-c33fe235a286",
+      "name": "Check Apify Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1184,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.data.status }}",
+              "rightValue": "SUCCEEDED",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ae853661-b09f-4384-a5d8-d68743a2d598",
+      "name": "Is Job Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -976,
+        1936
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.apify.com/v2/datasets/{{ $('Apify - Fetch Jobs').first().json.data.defaultDatasetId }}/items?token={{ $('Workflow Configuration').first().json.apifyToken }}",
+        "options": {}
+      },
+      "id": "5dfa46a3-38d2-4f86-a803-dec251de2eca",
+      "name": "Fetch Apify Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1552,
+        2144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst jobs = [];\nconst seen = new Set();\n\nfunction stripHtml(html) {\n  if (!html) return '';\n  return html\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/?(li|p|div|h[1-6])[^>]*>/gi, '\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfor (const item of results) {\n  const j = item.json;\n  const jobLink = j.link || j.jobUrl || j.url || '';\n  if (seen.has(jobLink) || !jobLink) continue;\n\n  const postedAt = j.postedAt || '';\n  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);\n  if (postedAt < sevenDaysAgo) continue;\n\n  const jobDescription = j.descriptionHtml\n    ? stripHtml(j.descriptionHtml)\n    : (j.descriptionText || '');\n  if (!jobDescription || jobDescription.length < 50) continue;\n\n  jobs.push({\n    title:          j.title          || 'No Title',\n    company:        j.companyName    || 'Unknown Company',\n    location:       j.location       || 'Unknown Location',\n    postedAt,\n    employmentType: j.employmentType || '',\n    seniorityLevel: j.seniorityLevel || '',\n    jobLink,\n    jobDescription\n  });\n\n  seen.add(jobLink);\n  if (jobs.length >= 20) break;\n}\n\nreturn jobs.map(job => ({ json: job }));"
+      },
+      "id": "cc5298a4-3aa1-4f26-b1f4-c375b79a8e3d",
+      "name": "Parse Apify Job Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        2144
+      ]
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "pdfData",
+        "name": "={{ $('Render HTML').item.json.filename }}.pdf",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root"
+        },
+        "options": {}
+      },
+      "id": "820c2203-a1cb-4dda-aa1b-ae916aef7c04",
+      "name": "Upload PDF to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2592,
+        2784
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst today = new Date().toISOString().slice(0,10);\nconst apps = $('Assemble Application').all().map(i => i.json);\n\nconst scoreColor = s => s >= 80 ? '#16a34a' : s >= 70 ? '#d97706' : '#6b7280';\nconst chip = (t, bg, fg) => `<span style=\"display:inline-block;background:${bg};color:${fg};font-size:12px;line-height:1;padding:5px 9px;border-radius:999px;margin:0 4px 4px 0\">${esc(t)}</span>`;\nconst btn = (href, label, bg) => href ? `<a href=\"${href}\" style=\"display:inline-block;background:${bg};color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:8px 14px;border-radius:8px;margin:0 6px 0 0\">${esc(label)}</a>` : '';\n\nlet cards = '';\nfor (const a of apps) {\n  const sc = Number(a.match_score) || 0;\n  const strengths = (a.strengths||[]).map(t => chip(t, '#dcfce7', '#166534')).join('') || '<span style=\"color:#9ca3af;font-size:13px\">;</span>';\n  const missing = (a.missing_skills||[]).map(t => chip(t, '#fef3c7', '#92400e')).join('') || '<span style=\"color:#9ca3af;font-size:13px\">None 🎉</span>';\n  cards += `\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #e5e7eb;border-radius:12px;margin:0 0 16px;background:#fff\">\n    <tr><td style=\"padding:18px 20px\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>\n        <td style=\"vertical-align:top\">\n          <div style=\"font-size:17px;font-weight:700;color:#111827\">${esc(a.company)}</div>\n          <div style=\"font-size:14px;color:#4b5563;margin-top:2px\">${esc(a.title)}</div>\n          ${a.location ? `<div style=\"font-size:12px;color:#9ca3af;margin-top:2px\">${esc(a.location)}</div>` : ''}\n        </td>\n        <td style=\"vertical-align:top;text-align:right;white-space:nowrap\">\n          <span style=\"display:inline-block;background:${scoreColor(sc)};color:#fff;font-size:15px;font-weight:700;padding:6px 12px;border-radius:999px\">${sc}<span style=\"font-size:11px;font-weight:500\">/100</span></span>\n        </td>\n      </tr></table>\n      <div style=\"margin-top:14px\">\n        <div style=\"font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;font-weight:600;margin-bottom:6px\">Strengths</div>\n        <div>${strengths}</div>\n      </div>\n      <div style=\"margin-top:12px\">\n        <div style=\"font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;font-weight:600;margin-bottom:6px\">Missing / to address</div>\n        <div>${missing}</div>\n      </div>\n            ${a.reason ? `<div style=\"margin-top:12px;font-size:13px;color:#4b5563;background:#f9fafb;border-left:3px solid #d1d5db;padding:9px 12px;border-radius:0 6px 6px 0\"><span style=\"font-weight:600;color:#374151\">Why:</span> ${esc(a.reason)}</div>` : ''}\n      <div style=\"margin-top:16px\">\n        ${btn(a.jobLink, 'View Job', '#2563eb')}\n        ${btn(a.docLink, 'Edit Resume (Doc)', '#7c3aed')}\n        ${btn(a.pdfLink, 'Download PDF', '#111827')}\n      </div>\n    </td></tr>\n  </table>`;\n}\n\nconst avg = apps.length ? Math.round(apps.reduce((s,a)=>s+(Number(a.match_score)||0),0)/apps.length) : 0;\nconst body = `\n<div style=\"background:#f3f4f6;padding:24px 0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif\">\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\">\n    <table role=\"presentation\" width=\"640\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:640px;width:100%\">\n      <tr><td style=\"padding:0 8px\">\n        <div style=\"font-size:22px;font-weight:800;color:#111827\">Your ATS Applications</div>\n        <div style=\"font-size:13px;color:#6b7280;margin:4px 0 18px\">${apps.length} match${apps.length===1?'':'es'} • avg fit ${avg}/100 • ${new Date().toLocaleString()}</div>\n      </td></tr>\n      <tr><td style=\"padding:0 8px\">${cards}</td></tr>\n      <tr><td style=\"padding:8px 8px 0;text-align:center;color:#9ca3af;font-size:11px\">Generated automatically by your Job Apply Bot • ${today}</td></tr>\n    </table>\n  </td></tr></table>\n</div>`;\n\nreturn [{ json: { subject: `🎯 ${apps.length} ATS application${apps.length===1?'':'s'} ready ; ${today}`, body } }];"
+      },
+      "id": "0553f460-d26b-4fa6-94c9-2f8a98f3a04e",
+      "name": "Email Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1712,
+        2896
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Docs API - Get Document": {
+      "main": [
+        [
+          {
+            "node": "Extract Full Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Full Text": {
+      "main": [
+        [
+          {
+            "node": "Profile Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LinkedIn URL": {
+      "main": [
+        [
+          {
+            "node": "Apify - Fetch Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10 Seconds1": {
+      "main": [
+        [
+          {
+            "node": "Check Apify Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Out Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Hard Pre-Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Profile Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Candidate JSON": {
+      "main": [
+        [
+          {
+            "node": "Store Profile Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Profile Cache": {
+      "main": [
+        [
+          {
+            "node": "Build LinkedIn URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hard Pre-Filter": {
+      "main": [
+        [
+          {
+            "node": "Job Matcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Job Matcher",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profile Parser": {
+      "main": [
+        [
+          {
+            "node": "Parse Candidate JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job Matcher": {
+      "main": [
+        [
+          {
+            "node": "Parse Match JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Match JSON": {
+      "main": [
+        [
+          {
+            "node": "IF Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to 5 Jobs": {
+      "main": [
+        [
+          {
+            "node": "Filter Out Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Gate": {
+      "main": [
+        [
+          {
+            "node": "Resume Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Resume Builder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Builder": {
+      "main": [
+        [
+          {
+            "node": "Parse Resume JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Resume JSON": {
+      "main": [
+        [
+          {
+            "node": "Render HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render HTML": {
+      "main": [
+        [
+          {
+            "node": "Build Multipart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Multipart": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export to PDF": {
+      "main": [
+        [
+          {
+            "node": "Upload PDF to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Application": {
+      "main": [
+        [
+          {
+            "node": "Store Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Application": {
+      "main": [
+        [
+          {
+            "node": "Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Export to PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Google Docs API - Get Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 7 AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apify - Fetch Jobs": {
+      "main": [
+        [
+          {
+            "node": "Check Apify Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Apify Status": {
+      "main": [
+        [
+          {
+            "node": "Is Job Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Job Complete?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Apify Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10 Seconds1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Apify Results": {
+      "main": [
+        [
+          {
+            "node": "Parse Apify Job Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Apify Job Results": {
+      "main": [
+        [
+          {
+            "node": "Limit to 5 Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload PDF to Drive": {
+      "main": [
+        [
+          {
+            "node": "Assemble Application",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Summary": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "338e9e6a-e785-4f92-be7b-93a249402e7d",
+  "meta": {
+    "instanceId": "REPLACE_WITH_YOUR_INSTANCE_ID"
+  },
+  "nodeGroups": [],
+  "id": "4FATpf9jGat0dX5j",
+  "tags": []
+}

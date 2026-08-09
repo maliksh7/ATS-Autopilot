@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATS Autopilot — AI Job Application Engine</title>
+<meta name="description" content="A self-hosted AI engine that turns one master profile into fit-scored, job-tailored resumes — automatically, every day. Built with n8n, Groq (Llama 3.3 70B), Apify, Supabase, and the Google Docs & Drive API.">
+<meta property="og:title" content="ATS Autopilot — AI Job Application Engine">
+<meta property="og:description" content="Fit-scored, profile-driven, auto-tailored resumes. n8n · Groq · Apify · Supabase · Google APIs.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#0b0f17; --bg2:#0f1522; --card:#131a28; --border:#25304a;
+    --text:#e8eef8; --muted:#93a1b8; --accent1:#7c3aed; --accent2:#2563eb;
+    --green-bg:#12291b; --green-fg:#4ade80; --amber-bg:#2a2410; --amber-fg:#fbbf24;
+    --radius:16px; --maxw:1080px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,rgba(124,58,237,.18),transparent),
+               radial-gradient(1000px 500px at 0% 10%,rgba(37,99,235,.14),transparent),var(--bg);
+    color:var(--text); line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px}
+  .accent{background:linear-gradient(90deg,var(--accent1),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:10;backdrop-filter:blur(10px);background:rgba(11,15,23,.72);border-bottom:1px solid var(--border)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.2px}
+  .brand .dot{font-size:20px}
+  .nav-links{display:flex;gap:22px;align-items:center}
+  .nav-links a{color:var(--muted);font-size:14px;font-weight:600}
+  .nav-links a:hover{color:var(--text)}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;font-weight:700;font-size:14px;border:1px solid var(--border);transition:.15s}
+  .btn-primary{background:linear-gradient(90deg,var(--accent1),var(--accent2));border:none;color:#fff}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-ghost:hover{border-color:#3a4a6b;background:var(--card)}
+  @media(max-width:680px){.nav-links a:not(.btn){display:none}}
+
+  /* hero */
+  header{padding:72px 0 40px;text-align:center}
+  .pill{display:inline-block;font-size:12.5px;font-weight:700;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:6px 14px;margin-bottom:22px}
+  h1{font-size:clamp(34px,6vw,60px);line-height:1.05;font-weight:850;letter-spacing:-1px}
+  .sub{max-width:640px;margin:20px auto 0;color:var(--muted);font-size:clamp(16px,2.4vw,20px)}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:32px}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+  .badge{font-size:12px;font-weight:600;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 11px}
+
+  section{padding:56px 0}
+  .eyebrow{text-align:center;color:var(--accent2);font-weight:800;letter-spacing:1.5px;font-size:12.5px;text-transform:uppercase}
+  h2{text-align:center;font-size:clamp(26px,4vw,36px);font-weight:800;margin-top:8px;letter-spacing:-.5px}
+  .lead{text-align:center;color:var(--muted);max-width:640px;margin:14px auto 0}
+
+  /* feature grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;margin-top:40px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+  .card .ic{font-size:24px}
+  .card h3{margin:12px 0 6px;font-size:17px}
+  .card p{color:var(--muted);font-size:14.5px}
+
+  /* pipeline */
+  .flow{display:flex;flex-direction:column;gap:14px;max-width:760px;margin:40px auto 0}
+  .stage{display:flex;align-items:flex-start;gap:16px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative}
+  .stage .num{flex:0 0 40px;height:40px;width:40px;border-radius:11px;display:grid;place-items:center;font-weight:800;background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#fff}
+  .stage h4{font-size:16px}
+  .stage p{color:var(--muted);font-size:14px;margin-top:2px}
+  .stage .tag{font-size:11px;font-weight:700;color:var(--accent2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;margin-left:8px;white-space:nowrap}
+  .arrow{text-align:center;color:var(--border);font-size:18px;line-height:0;margin:-6px 0}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:36px}
+  .chip{font-weight:700;font-size:14px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 15px}
+
+  /* gallery */
+  .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:40px}
+  .shot{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .shot img{width:100%;display:block}
+  .shot .ph{aspect-ratio:16/10;display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;padding:20px;background:repeating-linear-gradient(45deg,#0f1522,#0f1522 10px,#121a29 10px,#121a29 20px)}
+  .shot .cap{padding:12px 16px;font-size:13px;color:var(--muted);border-top:1px solid var(--border)}
+
+  /* decisions */
+  .list{max-width:760px;margin:36px auto 0;display:grid;gap:14px}
+  .li{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent1);border-radius:0 12px 12px 0;padding:16px 18px}
+  .li b{color:var(--text)}
+  .li span{color:var(--muted)}
+
+  footer{border-top:1px solid var(--border);padding:40px 0;text-align:center;color:var(--muted);font-size:14px}
+  footer a{color:var(--accent2);font-weight:600}
+  .disclaimer{max-width:680px;margin:14px auto 0;font-size:12.5px;color:#6b7789}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand"><span class="dot">🎯</span> ATS Autopilot</div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#stack">Stack</a>
+      <a class="btn btn-ghost" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">★ GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="wrap">
+  <span class="pill">Self-hosted · AI-powered · Runs daily</span>
+  <h1>Turn one profile into<br><span class="accent">fit-scored, tailored résumés</span></h1>
+  <p class="sub">An automation that finds relevant jobs, decides whether each is worth applying to, and writes a job-specific résumé — as an editable Google Doc and a PDF — every morning, hands-off.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">View on GitHub →</a>
+    <a class="btn btn-ghost" href="https://github.com/maliksh7/ATS-Autopilot/blob/main/docs/setup.md" target="_blank" rel="noopener">Read the setup guide</a>
+  </div>
+  <div class="badges">
+    <span class="badge">n8n (Docker)</span>
+    <span class="badge">Groq · Llama 3.3 70B</span>
+    <span class="badge">Apify</span>
+    <span class="badge">Supabase / Postgres</span>
+    <span class="badge">Google Docs &amp; Drive API</span>
+    <span class="badge">MIT</span>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow">What it does</div>
+    <h2>Apply to the <span class="accent">right</span> jobs — not more jobs</h2>
+    <p class="lead">A rich master profile drives everything. The engine only spends effort on roles that actually fit.</p>
+    <div class="grid">
+      <div class="card"><div class="ic">🔍</div><h3>Sources fresh roles</h3><p>Pulls LinkedIn postings from the last 24 hours for your target titles and locations.</p></div>
+      <div class="card"><div class="ic">🎯</div><h3>Scores fit, then gates</h3><p>An LLM returns a match score, strengths, and missing skills — low-fit jobs are dropped before any résumé is written.</p></div>
+      <div class="card"><div class="ic">✍️</div><h3>Tailors, never fabricates</h3><p>Selects and rephrases real experience per job description. A “do-not-claim” list keeps it honest.</p></div>
+      <div class="card"><div class="ic">🗂️</div><h3>Editable Doc + PDF</h3><p>Generates a Google Doc you can tweak, plus a matching PDF exported from the same source.</p></div>
+      <div class="card"><div class="ic">🧾</div><h3>Logs everything</h3><p>Every application — score, keywords, links, metadata — is stored in Postgres for tracking.</p></div>
+      <div class="card"><div class="ic">📊</div><h3>Dashboard email</h3><p>A daily summary with fit badges, strength/missing chips, and one-click links to each résumé.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="architecture" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="eyebrow">Architecture</div>
+    <h2>Seven stages, three AI calls</h2>
+    <p class="lead">One linear pipeline in n8n. The only branch is the fit-score gate.</p>
+    <div class="flow">
+      <div class="stage"><div class="num">1</div><div><h4>Trigger &amp; Config</h4><p>Daily schedule and all run parameters in one place.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">2</div><div><h4>Profile Ingestion <span class="tag">LLM · parse</span></h4><p>Profile Doc → Candidate JSON, cached in Supabase.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">3</div><div><h4>Job Sourcing</h4><p>Build search → Apify scrape (poll) → parse, limit, dedupe.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">4</div><div><h4>Fit Scoring &amp; Gate <span class="tag">LLM · match</span></h4><p>Score each job; only <b>should_apply &amp; score ≥ threshold</b> pass.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">5</div><div><h4>Résumé Generation <span class="tag">LLM · write</span></h4><p>Tailored résumé JSON → validate → render HTML.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">6</div><div><h4>Document &amp; Export</h4><p>HTML → editable Google Doc → native PDF export → Drive.</p></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="num">7</div><div><h4>Persist &amp; Notify</h4><p>Store the application record and send the dashboard email.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow">Screenshots</div>
+    <h2>See it in action</h2>
+    <div class="shots">
+      <div class="shot">
+        <img src="assets/email-dashboard.png" alt="Dashboard email" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/email-dashboard.png&lt;/div&gt;'">
+        <div class="cap">Daily dashboard email — fit score, strengths, gaps, links.</div>
+      </div>
+      <div class="shot">
+        <img src="assets/sample-resume.png" alt="Generated résumé" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/sample-resume.png&lt;/div&gt;'">
+        <div class="cap">A generated, ATS-friendly résumé (editable Doc + PDF).</div>
+      </div>
+      <div class="shot">
+        <img src="assets/workflow-diagram.png" alt="n8n workflow" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/workflow-diagram.png&lt;/div&gt;'">
+        <div class="cap">The n8n workflow, grouped into the 7 stages.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stack" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="eyebrow">Tech</div>
+    <h2>Built with</h2>
+    <div class="chips">
+      <span class="chip">n8n</span>
+      <span class="chip">Groq · Llama 3.3 70B</span>
+      <span class="chip">Apify</span>
+      <span class="chip">Supabase</span>
+      <span class="chip">PostgreSQL</span>
+      <span class="chip">Google Docs API</span>
+      <span class="chip">Google Drive API</span>
+      <span class="chip">Gmail API</span>
+      <span class="chip">Docker</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow">Why it works</div>
+    <h2>Design decisions</h2>
+    <div class="list">
+      <div class="li"><b>Profile as a superset, résumé as a projection.</b> <span>The master profile holds more than any résumé — so tailoring is selection + rephrasing, never fabrication.</span></div>
+      <div class="li"><b>Fit-score gate first.</b> <span>The highest-leverage step: LLM tokens are spent only on jobs worth applying to.</span></div>
+      <div class="li"><b>Code guards the LLM.</b> <span>Deterministic post-processing dedupes roles, drops hallucinations, caps projects, and extracts clean JSON — so model variance never breaks a résumé.</span></div>
+      <div class="li"><b>One source of truth.</b> <span>HTML → editable Google Doc → native PDF export means the Doc and PDF never drift.</span></div>
+      <div class="li"><b>Self-hosted.</b> <span>Your profile and applications stay on infrastructure you control.</span></div>
+    </div>
+    <div class="cta" style="margin-top:36px">
+      <a class="btn btn-primary" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">Explore the code →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Built by <a href="https://github.com/maliksh7" target="_blank" rel="noopener">Muhammad Saad Hassan</a> ·
+    <a href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">Repository</a> ·
+    <a href="https://github.com/maliksh7/ATS-Autopilot/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+    <p class="disclaimer">A personal automation for a single user's own job search. It prepares tailored materials for you to review and send — it does not auto-submit applications. Respect the Terms of Service of any site whose data you access.</p>
+  </div>
+</footer>
+
+</body>
+</html>

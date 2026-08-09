@@ -1,0 +1,27 @@
+# ---- Secrets & personal data (NEVER commit) ----
+.env
+.env.*
+secrets/
+*.secret
+*.local.json
+
+# Your REAL profile (commit only the .example.md template)
+profile/CANDIDATE_PROFILE.md
+profile/*.private.md
+
+# Un-sanitized workflow exports straight from n8n
+workflow/*.raw.json
+workflow/*.export.json
+
+# ---- Node / tooling ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
