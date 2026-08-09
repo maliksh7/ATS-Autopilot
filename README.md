@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/logo.svg" width="88" alt="ATS Autopilot logo"/>
+
 # ATS Autopilot
 
 **An AI-powered, self-hosted engine that turns one master profile into fit-scored, job-tailored resumes ; automatically, every day.**

@@ -8,7 +8,7 @@
 <meta property="og:title" content="ATS Autopilot — AI Job Application Engine">
 <meta property="og:description" content="Fit-scored, profile-driven, auto-tailored resumes. n8n · Groq · Apify · Supabase · Google APIs.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <style>
   :root{
     --bg:#0b0f17; --bg2:#0f1522; --card:#131a28; --border:#25304a;
@@ -92,17 +92,25 @@
   footer{border-top:1px solid var(--border);padding:40px 0;text-align:center;color:var(--muted);font-size:14px}
   footer a{color:var(--accent2);font-weight:600}
   .disclaimer{max-width:680px;margin:14px auto 0;font-size:12.5px;color:#6b7789}
+
+  /* contact */
+  .contactcard{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:34px}
+  .ci{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 24px;min-width:230px;text-align:center}
+  .ci .k{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:6px}
+  .ci .v{font-size:15px;color:var(--text);font-weight:600}
+  a.v:hover{color:var(--accent2)}
 </style>
 </head>
 <body>
 
 <nav>
   <div class="wrap">
-    <div class="brand"><span class="dot">🎯</span> ATS Autopilot</div>
+    <div class="brand"><img src="assets/logo.svg" alt="" width="26" height="26" style="border-radius:7px;display:block"> ATS Autopilot</div>
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#architecture">Architecture</a>
       <a href="#stack">Stack</a>
+      <a href="#contact">Contact</a>
       <a class="btn btn-ghost" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">★ GitHub</a>
     </div>
   </div>
@@ -110,8 +118,8 @@
 
 <header class="wrap">
   <span class="pill">Self-hosted · AI-powered · Runs daily</span>
-  <h1>Turn one profile into<br><span class="accent">fit-scored, tailored résumés</span></h1>
-  <p class="sub">An automation that finds relevant jobs, decides whether each is worth applying to, and writes a job-specific résumé — as an editable Google Doc and a PDF — every morning, hands-off.</p>
+  <h1>Turn one profile into<br><span class="accent">fit-scored, tailored resumes</span></h1>
+  <p class="sub">An automation that finds relevant jobs, decides whether each is worth applying to, and writes a job-specific resume — as an editable Google Doc and a PDF — every morning, hands-off.</p>
   <div class="cta">
     <a class="btn btn-primary" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">View on GitHub →</a>
     <a class="btn btn-ghost" href="https://github.com/maliksh7/ATS-Autopilot/blob/main/docs/setup.md" target="_blank" rel="noopener">Read the setup guide</a>
@@ -133,11 +141,11 @@
     <p class="lead">A rich master profile drives everything. The engine only spends effort on roles that actually fit.</p>
     <div class="grid">
       <div class="card"><div class="ic">🔍</div><h3>Sources fresh roles</h3><p>Pulls LinkedIn postings from the last 24 hours for your target titles and locations.</p></div>
-      <div class="card"><div class="ic">🎯</div><h3>Scores fit, then gates</h3><p>An LLM returns a match score, strengths, and missing skills — low-fit jobs are dropped before any résumé is written.</p></div>
+      <div class="card"><div class="ic">🎯</div><h3>Scores fit, then gates</h3><p>An LLM returns a match score, strengths, and missing skills — low-fit jobs are dropped before any resume is written.</p></div>
       <div class="card"><div class="ic">✍️</div><h3>Tailors, never fabricates</h3><p>Selects and rephrases real experience per job description. A “do-not-claim” list keeps it honest.</p></div>
       <div class="card"><div class="ic">🗂️</div><h3>Editable Doc + PDF</h3><p>Generates a Google Doc you can tweak, plus a matching PDF exported from the same source.</p></div>
       <div class="card"><div class="ic">🧾</div><h3>Logs everything</h3><p>Every application — score, keywords, links, metadata — is stored in Postgres for tracking.</p></div>
-      <div class="card"><div class="ic">📊</div><h3>Dashboard email</h3><p>A daily summary with fit badges, strength/missing chips, and one-click links to each résumé.</p></div>
+      <div class="card"><div class="ic">📊</div><h3>Dashboard email</h3><p>A daily summary with fit badges, strength/missing chips, and one-click links to each resume.</p></div>
     </div>
   </div>
 </section>
@@ -156,7 +164,7 @@
       <div class="arrow">↓</div>
       <div class="stage"><div class="num">4</div><div><h4>Fit Scoring &amp; Gate <span class="tag">LLM · match</span></h4><p>Score each job; only <b>should_apply &amp; score ≥ threshold</b> pass.</p></div></div>
       <div class="arrow">↓</div>
-      <div class="stage"><div class="num">5</div><div><h4>Résumé Generation <span class="tag">LLM · write</span></h4><p>Tailored résumé JSON → validate → render HTML.</p></div></div>
+      <div class="stage"><div class="num">5</div><div><h4>Resume Generation <span class="tag">LLM · write</span></h4><p>Tailored resume JSON → validate → render HTML.</p></div></div>
       <div class="arrow">↓</div>
       <div class="stage"><div class="num">6</div><div><h4>Document &amp; Export</h4><p>HTML → editable Google Doc → native PDF export → Drive.</p></div></div>
       <div class="arrow">↓</div>
@@ -175,8 +183,8 @@
         <div class="cap">Daily dashboard email — fit score, strengths, gaps, links.</div>
       </div>
       <div class="shot">
-        <img src="assets/sample-resume.png" alt="Generated résumé" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/sample-resume.png&lt;/div&gt;'">
-        <div class="cap">A generated, ATS-friendly résumé (editable Doc + PDF).</div>
+        <img src="assets/sample-resume.png" alt="Generated resume" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/sample-resume.png&lt;/div&gt;'">
+        <div class="cap">A generated, ATS-friendly resume (editable Doc + PDF).</div>
       </div>
       <div class="shot">
         <img src="assets/workflow-diagram.png" alt="n8n workflow" onerror="this.outerHTML='&lt;div class=\'ph\'&gt;Add assets/workflow-diagram.png&lt;/div&gt;'">
@@ -209,14 +217,36 @@
     <div class="eyebrow">Why it works</div>
     <h2>Design decisions</h2>
     <div class="list">
-      <div class="li"><b>Profile as a superset, résumé as a projection.</b> <span>The master profile holds more than any résumé — so tailoring is selection + rephrasing, never fabrication.</span></div>
+      <div class="li"><b>Profile as a superset, resume as a projection.</b> <span>The master profile holds more than any resume — so tailoring is selection + rephrasing, never fabrication.</span></div>
       <div class="li"><b>Fit-score gate first.</b> <span>The highest-leverage step: LLM tokens are spent only on jobs worth applying to.</span></div>
-      <div class="li"><b>Code guards the LLM.</b> <span>Deterministic post-processing dedupes roles, drops hallucinations, caps projects, and extracts clean JSON — so model variance never breaks a résumé.</span></div>
+      <div class="li"><b>Code guards the LLM.</b> <span>Deterministic post-processing dedupes roles, drops hallucinations, caps projects, and extracts clean JSON — so model variance never breaks a resume.</span></div>
       <div class="li"><b>One source of truth.</b> <span>HTML → editable Google Doc → native PDF export means the Doc and PDF never drift.</span></div>
       <div class="li"><b>Self-hosted.</b> <span>Your profile and applications stay on infrastructure you control.</span></div>
     </div>
     <div class="cta" style="margin-top:36px">
       <a class="btn btn-primary" href="https://github.com/maliksh7/ATS-Autopilot" target="_blank" rel="noopener">Explore the code →</a>
+    </div>
+  </div>
+</section>
+
+<section id="contact" style="background:var(--bg2)">
+  <div class="wrap">
+    <div class="eyebrow">Contact</div>
+    <h2>Want a <span class="accent">customized</span> version?</h2>
+    <p class="lead">Need this adapted to your stack — different job sources, custom resume templates, ATS or CRM integrations, or a managed deployment? I build tailored versions of this engine. Let's talk.</p>
+    <div class="contactcard">
+      <div class="ci">
+        <div class="k">Email</div>
+        <a class="v" href="mailto:muhsaad.hassan@gmail.com">muhsaad.hassan@gmail.com</a>
+      </div>
+      <div class="ci">
+        <div class="k">Location</div>
+        <div class="v">Munich, Germany</div>
+      </div>
+    </div>
+    <div class="cta" style="margin-top:26px">
+      <a class="btn btn-primary" href="mailto:muhsaad.hassan@gmail.com?subject=Custom%20ATS%20Autopilot%20inquiry">Email me →</a>
+      <a class="btn btn-ghost" href="https://maliksh7.github.io/#contact" target="_blank" rel="noopener">Contact via portfolio</a>
     </div>
   </div>
 </section>

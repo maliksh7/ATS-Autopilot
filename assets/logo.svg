@@ -1,0 +1,12 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ATS Autopilot logo">
+  <defs>
+    <linearGradient id="atsGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#atsGrad)"/>
+  <!-- folded paper-plane / navigation mark (send + autopilot) -->
+  <path d="M32 13 L52 51 L32 41 Z" fill="#ffffff"/>
+  <path d="M32 13 L12 51 L32 41 Z" fill="#ffffff" fill-opacity="0.72"/>
+</svg>
